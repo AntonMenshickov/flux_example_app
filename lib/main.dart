@@ -1,6 +1,9 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:isolate';
 
+import 'package:android_id/android_id.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flux_plugin/flux_plugin.dart';
 import 'package:flux_test_app/key_value_editor.dart';
@@ -11,17 +14,21 @@ void main() {
     () async {
       WidgetsFlutterBinding.ensureInitialized();
 
+      final deviceId = await getId();
+
       final appDocumentsDir = await path_provider
           .getApplicationDocumentsDirectory();
+      final deviceName = await getDeviceName();
+      final osName = await getOsName();
       final FluxLogs flux = FluxLogs.instance;
       await flux.init(
         FluxLogsConfig(
           deviceInfo: DeviceInfo(
             platform: 'android',
             bundleId: 'com.example.android',
-            deviceId: 'abcd',
-            deviceName: 'ANTON PC',
-            osName: 'windows 11',
+            deviceId: deviceId,
+            deviceName: deviceName,
+            osName: osName,
           ),
           releaseMode: false,
           sendLogLevels: {...LogLevel.values},
@@ -62,6 +69,54 @@ void main() {
       );
     },
   );
+}
+
+Future<String> getId() async {
+  var deviceInfo = DeviceInfoPlugin();
+  if (Platform.isIOS) {
+    // import 'dart:io'
+    var iosDeviceInfo = await deviceInfo.iosInfo;
+    return iosDeviceInfo.identifierForVendor ?? 'null';
+  } else if (Platform.isAndroid) {
+    return (await AndroidId().getId()) ?? 'null';
+  }
+  return 'null';
+}
+
+Future<String> getOsName() async {
+  if (Platform.isAndroid) {
+    var androidInfo = await DeviceInfoPlugin().androidInfo;
+    var release = androidInfo.version.release;
+    var sdkInt = androidInfo.version.sdkInt;
+    var manufacturer = androidInfo.manufacturer;
+    var model = androidInfo.model;
+    return 'Android $release (SDK $sdkInt), $manufacturer $model';
+  }
+
+  if (Platform.isIOS) {
+    var iosInfo = await DeviceInfoPlugin().iosInfo;
+    var systemName = iosInfo.systemName;
+    var version = iosInfo.systemVersion;
+    var name = iosInfo.name;
+    var model = iosInfo.model;
+    '$systemName $version, $name $model';
+  }
+
+  return 'unknown';
+}
+
+Future<String> getDeviceName() async {
+  if (Platform.isAndroid) {
+    var androidInfo = await DeviceInfoPlugin().androidInfo;
+    return androidInfo.model;
+  }
+
+  if (Platform.isIOS) {
+    var iosInfo = await DeviceInfoPlugin().iosInfo;
+    return iosInfo.modelName;
+  }
+
+  return 'unknown';
 }
 
 void listenToIsolateErrors() {
