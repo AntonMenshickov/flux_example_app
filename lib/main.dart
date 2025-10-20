@@ -5,6 +5,7 @@ import 'dart:isolate';
 import 'package:android_id/android_id.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/material.dart';
+import 'package:flux_crash_handler/flux_crash_handler.dart';
 import 'package:flux_plugin/flux_plugin.dart';
 import 'package:flux_test_app/key_value_editor.dart';
 import 'package:path_provider/path_provider.dart' as path_provider;
@@ -13,6 +14,8 @@ void main() {
   runZonedGuarded(
     () async {
       WidgetsFlutterBinding.ensureInitialized();
+
+      await FluxCrashHandler.instance.initialize();
 
       final deviceId = await getId();
 
@@ -154,6 +157,8 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   late final TextEditingController _messageController;
+  CrashReport? _crashReport;
+
   LogLevel _logLevel = LogLevel.info;
   final Map<String, String> _messageMetaKeys = {};
   final List<String> _messageTags = [];
@@ -166,12 +171,21 @@ class _MyHomePageState extends State<MyHomePage> {
   void initState() {
     super.initState();
     _messageController = TextEditingController();
+    _getLashCrash();
   }
 
   @override
   void dispose() {
     _messageController.dispose();
     super.dispose();
+  }
+
+  void _getLashCrash() async {
+    final lastCrash = await FluxCrashHandler.instance.getLastCrash();
+
+    setState(() {
+      _crashReport = lastCrash;
+    });
   }
 
   void _sendEvent() {
@@ -238,6 +252,32 @@ class _MyHomePageState extends State<MyHomePage> {
             mainAxisAlignment: MainAxisAlignment.start,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
+              Text('Crash app!', style: textStyle.titleLarge),
+              ElevatedButton.icon(
+                onPressed: () {
+                  FluxCrashHandler.instance.triggerTestCrash();
+                },
+                label: Text('Crash!'),
+                icon: Icon(Icons.warning),
+              ),
+              if (_crashReport != null) ...[
+                const SizedBox(height: 8.0),
+                Text('Send crash report', style: textStyle.titleMedium),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    FluxLogs.instance.crash(
+                      _crashReport!.error,
+                      stackTrace: StackTrace.fromString(
+                        _crashReport!.stackTrace,
+                      ),
+                      timestamp: DateTime.tryParse(_crashReport!.timestamp),
+                    );
+                  },
+                  label: Text('Crash!'),
+                  icon: Icon(Icons.send),
+                ),
+              ],
+              const SizedBox(height: 16.0),
               Text('Default meta', style: textStyle.titleLarge),
               KeyValueEditor(
                 onChanged: (Map<String, String> value) {
