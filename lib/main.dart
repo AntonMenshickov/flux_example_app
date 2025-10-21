@@ -44,7 +44,6 @@ void main() {
         ),
         PrinterOptions(
           maxLineLength: 180,
-          chunkSize: 512,
           removeEmptyLines: false,
         ),
       );
